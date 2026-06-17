@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<!-- Android Chrome: 幅をデバイス幅に、ノッチ・ナビゲーションバーまで拡張 -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>共通テスト 成績管理</title>
+
+<!-- PWA manifest -->
+<link rel="manifest" href="manifest.json">
+
+<!-- テーマカラー: ライト/ダーク両対応 -->
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#4f6ef7">
+<meta name="theme-color" media="(prefers-color-scheme: dark)"  content="#1a1d2e">
+
+<!-- Android Chrome PWA -->
+<meta name="mobile-web-app-capable" content="yes">
+
+<!-- iOS Safari (念のため) -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="共通テスト">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-theme="light">
+
+<div class="drawer-overlay" id="drawerOverlay"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head">
+    <div class="drawer-logo">共通テスト <span>成績管理</span></div>
+    <button class="drawer-close" id="drawerClose">✕</button>
+  </div>
+  <div class="drawer-body" id="drawerBody"></div>
+</div>
+
+<header class="app-header">
+  <button class="ham-btn" id="hamBtn" title="メニュー">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="app-title">共通テスト <span>成績管理</span></div>
+  <div class="cur-tab-label" id="curTabLabel">総合概要</div>
+</header>
+
+<div class="main" id="mainContent"></div>
+<input type="file" id="importFile" accept=".json" style="display:none">
+
+<script src="app.js"></script>
+<script>
+  // Service Worker 登録
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg => console.log('SW registered:', reg.scope))
+        .catch(err => console.warn('SW registration failed:', err));
+    });
+  }
+
+  // Android: ダークモード連動でステータスバー色を更新
+  function updateThemeColor() {
+    const dark = document.body.dataset.theme === 'dark';
+    document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.remove());
+    const mc = document.createElement('meta');
+    mc.name = 'theme-color';
+    mc.content = dark ? '#1a1d2e' : '#4f6ef7';
+    document.head.appendChild(mc);
+  }
+  // app.js の applyTheme が呼ばれるたびに更新できるよう監視
+  const observer = new MutationObserver(() => updateThemeColor());
+  observer.observe(document.body, { attributes: true, attributeFilter: ['data-theme'] });
+</script>
+</body>
+</html>
