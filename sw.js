@@ -1,8 +1,9 @@
-const CACHE_NAME = 'kyotsu-v2';
+const CACHE_NAME = 'kyotsu-v3';
 const ASSETS = [
   './index.html',
   './style.css',
   './app.js',
+  './drive-sync.js',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
@@ -34,6 +35,10 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   // POSTなどのリクエストはスキップ
   if (event.request.method !== 'GET') return;
+
+  // 別オリジン (Google API / GIS など) は SW を通さず直接ネットワークへ。
+  // Drive API のレスポンスをキャッシュして古いデータを返す事故を防ぐ。
+  if (new URL(event.request.url).origin !== self.location.origin) return;
 
   event.respondWith(
     caches.match(event.request).then(cached => {

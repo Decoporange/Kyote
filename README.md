@@ -43,3 +43,7 @@ kyotsu-tracker/
 
 データは `localStorage` にキー `kyotsu_v5` で保存されます。  
 ブラウザのデータを消去するとリセットされるため、定期的に「データを書き出す」でバックアップしてください。
+
+### Google Drive 同期（任意）
+
+`drive-sync.js` に Google Cloud の OAuth クライアントID を設定すると、データを Google Drive の `kyote-data.json` に自動同期できます（ドロワーの「Googleドライブと連携」から有効化）。未設定の場合は連携 UI が表示されず、従来通りローカルのみで動作します。設定手順は `SETUP.md` を参照してください。

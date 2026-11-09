@@ -115,6 +115,9 @@ body{
   width:26px;height:26px;border-radius:6px;background:var(--surface2);
   display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;
 }
+.drive-sync-status{
+  font-size:11px;color:var(--text3);padding:0 10px 6px 46px;margin-top:-4px;
+}
 
 /* ── MAIN ── */
 .main{

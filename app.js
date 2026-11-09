@@ -36,7 +36,11 @@ let state = (() => {
   return s;
 })();
 
-function save() { localStorage.setItem('kyotsu_v5', JSON.stringify(state)); }
+function save() {
+  localStorage.setItem('kyotsu_v5', JSON.stringify(state));
+  // Drive 同期モジュール (drive-sync.js) への保存通知フック
+  document.dispatchEvent(new CustomEvent('kyote:saved'));
+}
 
 function ensure(id) {
   if (!state.subjects[id])       state.subjects[id] = defSubject(id);
@@ -209,6 +213,23 @@ function buildDrawer() {
   impBtn.innerHTML = '<span class="drawer-util-icon">📥</span>データを読み込む';
   impBtn.addEventListener('click', () => { document.getElementById('importFile').click(); closeDrawer(); });
   body.appendChild(impBtn);
+
+  // Google Drive 同期 (drive-sync.js がクライアントID未設定の場合は refreshUI がセクションを隠す)
+  const drvSec = document.createElement('div');
+  drvSec.id = 'driveSyncSection';
+  const drvBtn = document.createElement('button');
+  drvBtn.className = 'drawer-util-btn';
+  drvBtn.id = 'driveSyncBtn';
+  drvBtn.innerHTML = '<span class="drawer-util-icon">☁️</span><span id="driveSyncBtnLabel">Googleドライブと連携</span>';
+  drvBtn.addEventListener('click', () => { if (window.KyoteDrive) KyoteDrive.onButtonClick(); });
+  drvSec.appendChild(drvBtn);
+  const drvStatus = document.createElement('div');
+  drvStatus.className = 'drive-sync-status';
+  drvStatus.id = 'driveSyncStatus';
+  drvStatus.textContent = '未連携';
+  drvSec.appendChild(drvStatus);
+  body.appendChild(drvSec);
+  if (window.KyoteDrive) KyoteDrive.refreshUI();
 }
 
 function updateDrawerBadges() {
