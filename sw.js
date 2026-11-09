@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kyotsu-v4';
+const CACHE_NAME = 'kyotsu-v5';
 const ASSETS = [
   './index.html',
   './style.css',

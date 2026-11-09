@@ -228,6 +228,13 @@ function buildDrawer() {
   drvStatus.id = 'driveSyncStatus';
   drvStatus.textContent = '未連携';
   drvSec.appendChild(drvStatus);
+  const drvNow = document.createElement('button');
+  drvNow.className = 'drawer-util-btn';
+  drvNow.id = 'driveSyncNowBtn';
+  drvNow.style.display = 'none';
+  drvNow.innerHTML = '<span class="drawer-util-icon">🔄</span><span>今すぐ同期</span>';
+  drvNow.addEventListener('click', () => { if (window.KyoteDrive) KyoteDrive.syncNow(); });
+  drvSec.appendChild(drvNow);
   body.appendChild(drvSec);
   if (window.KyoteDrive) KyoteDrive.refreshUI();
 }

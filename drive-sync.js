@@ -25,7 +25,7 @@ const DRIVE_CLIENT_ID = '1019170607018-fl1m5ps4ai3k9bncnpqfi3qbfutfekaq.apps.goo
       var sec = document.getElementById('driveSyncSection');
       if (sec) sec.style.display = 'none';
     };
-    window.KyoteDrive = { refreshUI: hideSection, onButtonClick: function () {} };
+    window.KyoteDrive = { refreshUI: hideSection, onButtonClick: function () {}, syncNow: function () {} };
     hideSection();
     return;
   }
@@ -76,14 +76,17 @@ const DRIVE_CLIENT_ID = '1019170607018-fl1m5ps4ai3k9bncnpqfi3qbfutfekaq.apps.goo
     var enabled = localStorage.getItem(LS_ENABLED) === '1';
     var lastSync = localStorage.getItem(LS_LAST_SYNC);
     if (label) label.textContent = enabled ? 'Googleドライブ連携を解除' : 'Googleドライブと連携';
+    var nowBtn = el('driveSyncNowBtn');
+    if (nowBtn) nowBtn.style.display = enabled && !busy ? '' : 'none';
     if (!enabled) { setStatus('未連携'); return; }
     if (busy) { setStatus('同期中…'); return; }
+    if (localStorage.getItem(LS_LOCAL_AT)) { setStatus('未同期の変更あり（「今すぐ同期」で送信）'); return; }
     if (lastSync) setStatus('同期済み ' + hhmm(lastSync));
     else setStatus('連携済み（未同期）');
   }
 
   // app.js の buildDrawer から呼ばれる公開 API
-  window.KyoteDrive = { refreshUI: refreshUI, onButtonClick: onButtonClick };
+  window.KyoteDrive = { refreshUI: refreshUI, onButtonClick: onButtonClick, syncNow: syncNow };
 
   // ── トークン取得 (GIS) ─────────────────────────────────────
   function ensureTokenClient() {
@@ -311,6 +314,7 @@ const DRIVE_CLIENT_ID = '1019170607018-fl1m5ps4ai3k9bncnpqfi3qbfutfekaq.apps.goo
   // ── 自動アップロード (デバウンス付き) ──
   function autoUpload() {
     if (busy) return;
+    if (!tokenValid()) { refreshUI(); return; }  // 未認証セッションでは自動で認証画面を出さない
     getTokenAuto().then(function (ok) {
       if (!ok || busy) return;
       busy = true;
@@ -328,6 +332,21 @@ const DRIVE_CLIENT_ID = '1019170607018-fl1m5ps4ai3k9bncnpqfi3qbfutfekaq.apps.goo
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(autoUpload, DEBOUNCE_MS);
   });
+
+  // 手動同期 (ボタン起点なので、必要なら認証ポップアップが出てよい)
+  function syncNow() {
+    if (localStorage.getItem(LS_ENABLED) !== '1' || busy) return;
+    if (tokenValid()) { reconcileOnStart(); return; }
+    setStatus('認証中…');
+    var start = function () {
+      requestToken(true).then(function (ok) {
+        if (ok) reconcileOnStart();
+        else { setStatus('認証できませんでした'); }
+      });
+    };
+    if (ensureTokenClient()) start();
+    else waitForGis(function (ok) { if (ok) start(); else setStatus('Google に接続できませんでした'); });
+  }
 
   // ── ボタン操作 ──
   function onButtonClick() {
@@ -358,13 +377,6 @@ const DRIVE_CLIENT_ID = '1019170607018-fl1m5ps4ai3k9bncnpqfi3qbfutfekaq.apps.goo
 
   // ── 起動 ──
   refreshUI();
-  if (localStorage.getItem(LS_ENABLED) === '1') {
-    waitForGis(function (gisOk) {
-      if (!gisOk) return;
-      getTokenAuto().then(function (ok) {
-        if (ok) reconcileOnStart();
-        else refreshUI(); // サイレント取得不可 (要再連携) — 静かに諦める
-      });
-    });
-  }
+  // 起動時には認証リクエストを送らない (開くたびにアカウント選択が出るのを防ぐ)。
+  // 同期は「連携したセッション内での自動アップロード」と「今すぐ同期」ボタンで行う。
 })();
