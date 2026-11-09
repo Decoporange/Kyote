@@ -28,7 +28,7 @@ let state = (() => {
     const r = localStorage.getItem('kyotsu_v5');
     if (r) return JSON.parse(r);
   } catch(e) {}
-  const s = { subjects:{}, theme:'light', graphVisible:{}, selectedYear:'' };
+  const s = { subjects:{}, theme:'light', graphVisible:{}, selectedYear:'', customNames:{} };
   SUBJECTS.forEach(sub => {
     s.subjects[sub.id] = defSubject(sub.id);
     s.graphVisible[sub.id] = true;
@@ -55,6 +55,32 @@ function ensure(id) {
 // ═══════════════════════════════════════════════════════════════
 function getMaxScore(id) {
   return SUBJECTS.find(s => s.id === id)?.maxScore ?? 100;
+}
+
+// 表示名: カスタム名 (state.customNames) があればそちらを優先。内部IDは変えない。
+function dispName(id) {
+  const c = state.customNames && state.customNames[id];
+  if (c) return c;
+  const s = SUBJECTS.find(x => x.id === id);
+  return s ? s.name : id;
+}
+
+// 科目の表示名を変更する (空欄で既定名に戻す)
+function editSubjectName(id) {
+  const def = (SUBJECTS.find(x => x.id === id) || {}).name || id;
+  const cur = (state.customNames && state.customNames[id]) || '';
+  const v = prompt(`「${def}」の表示名を入力（空欄で既定の「${def}」に戻す）`, cur);
+  if (v === null) return;
+  if (!state.customNames) state.customNames = {};
+  const t = v.trim();
+  if (t) state.customNames[id] = t; else delete state.customNames[id];
+  save(); buildPanels(); buildDrawer(); switchTab(curTab);
+}
+
+// 年度ラベルの時系列順キー (例: 21本 < 21追 < 22本)。解釈できないラベルは最後。
+function yearOrder(lbl) {
+  const m = /^(\d{2})(本|追)/.exec(lbl || '');
+  return m ? (+m[1]) * 2 + (m[2] === '追' ? 1 : 0) : 9999;
 }
 
 // 大問単位: score / max（満点入力があれば）
@@ -168,7 +194,7 @@ function buildDrawer() {
     btn.id = 'drawer-tab-' + sub.id;
     const sc  = latestScore(sub.id);
     const col = state.subjects[sub.id].color;
-    btn.innerHTML = `<span class="dot" style="background:${col}"></span>${sub.name}<span class="sbadge">${sc !== null ? sc : '—'}</span>`;
+    btn.innerHTML = `<span class="dot" style="background:${col}"></span>${dispName(sub.id)}<span class="sbadge">${sc !== null ? sc : '—'}</span>`;
     btn.addEventListener('click', () => { switchTab(sub.id); closeDrawer(); });
     body.appendChild(btn);
   });
@@ -279,7 +305,7 @@ function switchTab(id) {
     if (id === 'overview') labelEl.textContent = '総合概要';
     else {
       const sub = SUBJECTS.find(s => s.id === id);
-      labelEl.textContent = sub ? sub.name : '';
+      labelEl.textContent = sub ? dispName(sub.id) : '';
     }
   }
   updateDrawerBadges();
@@ -373,7 +399,7 @@ function updateSummaryGrid() {
     card.innerHTML = `
       <div class="sum-name">
         <span style="width:8px;height:8px;border-radius:50%;background:${color};display:inline-block"></span>
-        ${sub.name}
+        ${dispName(sub.id)}
         <span style="font-size:10px;color:var(--text3);margin-left:2px">/${maxSc}点</span>
       </div>
       <div class="sum-score" style="color:${color}">${sc !== null ? sc : '—'}</div>
@@ -414,7 +440,7 @@ function buildAllRatesControls() {
     lbl.style.borderColor = checked ? col : 'var(--border)';
     lbl.style.background  = checked ? col + '22' : 'transparent';
     lbl.style.color       = checked ? col : 'var(--text3)';
-    lbl.innerHTML = `<input type="checkbox" ${checked ? 'checked' : ''} data-subid="${sub.id}">${sub.name}`;
+    lbl.innerHTML = `<input type="checkbox" ${checked ? 'checked' : ''} data-subid="${sub.id}">${dispName(sub.id)}`;
     lbl.querySelector('input').addEventListener('change', e => {
       state.graphVisible[sub.id] = e.target.checked;
       save();
@@ -444,7 +470,7 @@ function drawAllRatesGraph() {
       const sc = scoreForLabel(sub.id, lbl);
       return sc !== null ? Math.round((sc / maxSc) * 100) : null;
     });
-    return { label: sub.name, data, color: d.color };
+    return { label: dispName(sub.id), data, color: d.color };
   });
 
   // Y軸 0〜100%
@@ -471,7 +497,7 @@ function renderSubject(subId, panel) {
   panel.innerHTML = `
     <div class="subject-hero" style="background:${col}">
       <div class="shero-content">
-        <div class="shero-name">${sub.name} <span style="font-size:13px;opacity:.7;font-weight:500">（満点 ${maxSc}点）</span></div>
+        <div class="shero-name">${dispName(subId)} <span style="font-size:13px;opacity:.7;font-weight:500">（満点 ${maxSc}点）</span></div>
         <div class="shero-stats">
           <div class="hstat">
             <div class="hstat-val" id="sh-sc-${subId}">${lastSc !== null ? lastSc : '—'}</div>
@@ -488,6 +514,7 @@ function renderSubject(subId, panel) {
         </div>
       </div>
       <div class="color-wrap">
+        <button id="rename-${subId}" title="表示名を変更" style="background:rgba(255,255,255,.25);border:none;border-radius:8px;padding:4px 8px;font-size:12px;color:#fff;cursor:pointer;margin-right:6px">教科名変更</button>
         <input type="color" value="${col}" id="cpick-${subId}" title="色を変更">
       </div>
     </div>
@@ -519,6 +546,8 @@ function renderSubject(subId, panel) {
     if (hero) hero.style.background = e.target.value;
     updateDrawerBadges(); drawSubjectGraph(subId);
   });
+
+  document.getElementById(`rename-${subId}`).addEventListener('click', () => editSubjectName(subId));
 }
 
 function renderAllYears(subId) {
@@ -772,7 +801,7 @@ function drawSubjectGraph(subId) {
   if (!canvas) return;
   ensure(subId);
   const d      = state.subjects[subId];
-  const yrs    = d.years || [];
+  const yrs    = [...(d.years || [])].sort((a, b) => yearOrder(a.label) - yearOrder(b.label));
   const maxSc  = getMaxScore(subId);
   if (!yrs.length) { showEmpty(canvas, '年度を追加するとグラフが表示されます'); return; }
 
