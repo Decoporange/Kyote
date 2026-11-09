@@ -37,7 +37,8 @@ const DRIVE_CLIENT_ID = '1019170607018-fl1m5ps4ai3k9bncnpqfi3qbfutfekaq.apps.goo
   var LS_LAST_SYNC = 'kyote_drive_last_sync'; // 最後に同期した envelope.updatedAt (ISO)
   var LS_LOCAL_AT = 'kyote_drive_local_at';   // ローカルデータの最終変更時刻 (ISO)
   var LS_ENABLED = 'kyote_drive_enabled';     // '1' = 連携済み
-  var SCOPE = 'https://www.googleapis.com/auth/drive.file';
+  var LS_HINT = 'kyote_drive_hint';           // 連携アカウントのメール (サイレント認証用)
+  var SCOPE = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email';
   var API = 'https://www.googleapis.com/drive/v3';
   var UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3';
   var DEBOUNCE_MS = 3000;
@@ -116,6 +117,19 @@ const DRIVE_CLIENT_ID = '1019170607018-fl1m5ps4ai3k9bncnpqfi3qbfutfekaq.apps.goo
     return !!accessToken && Date.now() < tokenExpiresAt - 30 * 1000;
   }
 
+  // 連携アカウントのメールを userinfo から取得して保存する。
+  // 次回以降のトークン取得で hint として渡すことで、サイレント認証時に
+  // アカウント選択ポップアップが出なくなる。
+  function captureHint() {
+    if (localStorage.getItem(LS_HINT) || !accessToken) return;
+    fetch('https://openidconnect.googleapis.com/v1/userinfo', {
+      headers: { Authorization: 'Bearer ' + accessToken }
+    }).then(function (res) { return res.ok ? res.json() : null; })
+      .then(function (j) {
+        if (j && j.email) localStorage.setItem(LS_HINT, j.email);
+      }).catch(function () {});
+  }
+
   // interactive=true: ユーザー操作起点 (必要なら同意画面が出る)
   // interactive=false: サイレント (prompt:'')、対話が必要なら失敗を返す
   function requestToken(interactive) {
@@ -124,7 +138,10 @@ const DRIVE_CLIENT_ID = '1019170607018-fl1m5ps4ai3k9bncnpqfi3qbfutfekaq.apps.goo
       if (!ensureTokenClient()) { resolve(false); return; }
       tokenWaiters.push(resolve);
       try {
-        tokenClient.requestAccessToken(interactive ? {} : { prompt: '' });
+        var opts = interactive ? {} : { prompt: '' };
+        var hint = localStorage.getItem(LS_HINT);
+        if (hint) opts.hint = hint;
+        tokenClient.requestAccessToken(opts);
       } catch (e) {
         flushTokenWaiters(false);
       }
@@ -317,6 +334,7 @@ const DRIVE_CLIENT_ID = '1019170607018-fl1m5ps4ai3k9bncnpqfi3qbfutfekaq.apps.goo
     if (localStorage.getItem(LS_ENABLED) === '1') {
       // 連携解除
       localStorage.removeItem(LS_ENABLED);
+      localStorage.removeItem(LS_HINT);
       if (accessToken && window.google && google.accounts && google.accounts.oauth2) {
         try { google.accounts.oauth2.revoke(accessToken, function () {}); } catch (e) {}
       }
